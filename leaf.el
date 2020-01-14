@@ -104,6 +104,7 @@ Same as `list' but this macro does not evaluate any arguments."
    :bind*             (progn
                         (leaf-register-autoload (cadr leaf--value) leaf--name)
                         `((leaf-keys* ,(car leaf--value)) ,@leaf--body))
+   :bind-keymap       `(,@(mapcar (lambda (elm) `(setq ,(car elm) ,(cdr elm))) leaf--value) (leaf-keys ,(car leaf--value)) ,@leaf--body)
 
    :mode              (progn
                         (leaf-register-autoload (mapcar #'cdr leaf--value) leaf--name)
@@ -201,7 +202,7 @@ Sort by `leaf-sort-leaf--values-plist' in this order.")
               (lambda (elm) (leaf-normalize-list-in-list elm 'dotlistp))
               leaf--value)))
 
-    ((memq leaf--key '(:bind :bind*))
+    ((memq leaf--key '(:bind :bind* :bind-keymap :bind-keymap*))
      ;; Accept: `leaf-keys' accept form
      ;; Return: a pair like (leaf--value . (fn fn ...))
      (eval `(leaf-keys ,leaf--value ,leaf--name)))
@@ -794,6 +795,23 @@ FN also accept list of FN."
                (plist-get res ,(intern (format ":%s" sym)))
              (error ,(format "Failed to search `leaf-%s' in specified plstore" name))))
        (error "Right value is returns nil or `leaf-default-plstore' is not set"))))
+
+(defmacro leaf-hander-bind-keymap (name value &optional overwrite)
+  "Handler bind-keymap for NAME, VALUE.
+If OVERWRITE is non-nil, expand leaf-key*."
+  (let ((_bind (car value))
+        (fns   (cdr value))))
+  `(progn
+     ,@(mapcar (lambda (elm)
+                 `(progn
+                    (unless (fboundp ',elm)
+                      (defun ,elm ()
+                        (format "Function generated leaf to load %s and return keymap." name)
+                        (interactive)
+                        (if (not (require ',name nil 'noerror))
+                            (error ,(format "Cannot load package: %s" name))
+                          (if (and (boundp ',elm)
+                                   (keymapp ,elm)))))))))))
 
 
 ;;; General list functions for leaf
